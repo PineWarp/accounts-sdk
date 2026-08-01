@@ -1,381 +1,277 @@
-# rotur-sdk
+# accounts-sdk
 
-The official TypeScript SDK for the [Rotur](https://rotur.dev) platform. Covers auth, profiles, posts, credits, keys, groups, items, gifts, tokens, validators, status, files, cosmetics, push notifications, and more — all with full type safety.
+Bilup's mod of **rotur-sdk** — a typed client SDK for the Accounts API (formerly Rotur).
 
-## Install
+The SDK wraps the full platform API in a single library:
+
+- **Typed REST client** — every endpoint is exposed through namespaced methods with full TypeScript types.
+- **Authentication** — popup / iframe OAuth-style login that returns a bearer token, plus token-based session restoration.
+- **Real-time WebSocket** — presence, statuses, activities and per-user key-value state with automatic reconnection.
+- **Permission resolution** — maps the SDK methods you actually use to the minimal token permissions required.
+- **Icon rendering** — converts Scratch-style icon strings into SVG.
+
+## Installation
 
 ```bash
-npm install rotur-sdk
+npm install accounts-sdk
+```
+
+Both ESM and CommonJS entry points are provided, with type declarations.
+
+```js
+// ESM / TypeScript
+import { Rotur } from "accounts-sdk";
+
+// CommonJS
+const { Rotur } = require("accounts-sdk");
 ```
 
 ## Quick Start
 
-```ts
-import { Rotur } from "rotur-sdk";
+```js
+import { Rotur } from "accounts-sdk";
 
 const rotur = new Rotur();
 
-// Browser auth - opens the Rotur login popup
+// Opens the auth popup, waits for the token
 await rotur.login();
 
-// Or provide a token you already have
-const rotur = new Rotur({ token: "your-token-here" });
-```
+console.log(rotur.loggedIn); // true
+console.log(rotur.token);    // the bearer token
 
-## API Reference
+// --- REST API ---
+const me = await rotur.me.get();
+const feed = await rotur.posts.feed(50);
+await rotur.posts.create("Hello from accounts-sdk!");
 
-### Authentication
+// --- WebSocket (presence & live state) ---
+await rotur.connectSocket();
+rotur.socket.join("general");
 
-```ts
-// Popup-based OAuth flow (browser only)
-await rotur.login({ system: "my-app", timeout: 60_000 });
-
-// Check current auth state
-rotur.loggedIn; // boolean
-rotur.token; // string | null
-
-// Set/refresh token manually
-rotur.setToken("new-token");
-
-// Logout (clears token + disconnects socket)
-rotur.logout();
-```
-
-### Link-based Auth (for CLI / server)
-
-```ts
-const code = await rotur.link.getCode();
-console.log(`Visit https://rotur.dev/link and enter: ${code}`);
-
-// Polls until the user links on the website
-const token = await rotur.link.pollUntilLinked(code);
-```
-
-## Automatic Permission Scoping
-
-Rotur's auth page accepts a `?requires=` parameter — a comma-separated list of token permissions the app needs. When present, the user grants a **scoped sub-token** holding exactly those permissions instead of full account access.
-
-The SDK can compute this list for you at build time. A Vite plugin statically scans your source for the SDK methods you actually call, maps each to its required permission, dedupes, and injects the result. `rotur.login()` then appends `?requires=...` automatically — no hardcoding, and it stays in sync with your code.
-
-### Setup (Vite)
-
-```bash
-npm install -D ts-morph   # optional peer dep used by the plugin at build time
-```
-
-```ts
-// vite.config.ts
-import { defineConfig } from "vite";
-import roturPermissions from "rotur-sdk/vite";
-
-export default defineConfig({
-  plugins: [roturPermissions()],
-});
-```
-
-That's it. If your app calls `rotur.posts.create()`, `rotur.me.transfer()`, and `rotur.tokens.create()`, the build computes:
-
-```
-[rotur-permissions] 3 permission(s): credits:transfer, full, posts:create
-```
-
-and `rotur.login()` opens `rotur.dev/auth?...&requires=credits:transfer,full,posts:create`.
-
-Methods that hit endpoints requiring the **main account token** (e.g. `tokens.create`, `me.refreshToken`) resolve to `full`, which prompts the user for full access since a sub-token cannot satisfy them.
-
-### Options
-
-```ts
-roturPermissions({
-  tsConfigFilePath: "tsconfig.json",   // default
-  include: ["src/**/*.{ts,tsx,js,jsx}"], // files to scan
-  extraPermissions: ["files:manage"],  // add perms the scan can't detect
-  verbose: true,                       // log the computed list
-});
-```
-
-### Manual / dynamic calls
-
-The static scan can't see dynamic dispatch like `rotur[ns][method]()`. Cover those with `extraPermissions` above, or pass them at the call site (merged with the injected set):
-
-```ts
-await rotur.login({ requires: ["files:manage", "notifications:send"] });
-```
-
-### Without the plugin
-
-Pass the list yourself — `resolvePermissions` maps method keys to permissions using the same manifest:
-
-```ts
-import { resolvePermissions } from "rotur-sdk";
-
-const requires = resolvePermissions(["posts.create", "me.transfer"]);
-await rotur.login({ requires });
-```
-
-> The permission manifest is generated from the backend's route definitions via `npm run gen:permissions`. Regenerate it in the SDK repo whenever backend routes change.
-
-### Profiles
-
-```ts
-const profile = await rotur.profiles.get("username");
-const { exists } = await rotur.profiles.exists("username");
-const avatarUrl = rotur.profiles.getAvatarUrl("username");
-```
-
-### Account (me)
-
-```ts
-await rotur.me.get();
-await rotur.me.update("bio", "hello world");
-await rotur.me.transfer("recipient", 100, "a note");
-await rotur.me.claimDaily();
-await rotur.me.badges();
-await rotur.me.block("username");
-await rotur.me.unblock("username");
-await rotur.me.checkAuth();
-```
-
-### Posts
-
-```ts
-const post = await rotur.posts.create("Hello from the SDK!");
-await rotur.posts.reply(post.id, "Nice post!");
-await rotur.posts.like(post.id);
-await rotur.posts.repost(post.id);
-await rotur.posts.pin(post.id);
-
-const feed = await rotur.posts.feed(100, 0);
-const top = await rotur.posts.top(50, 24);
-const results = await rotur.posts.search("query");
-```
-
-### Friends
-
-```ts
-const { friends } = await rotur.friends.list();
-await rotur.friends.request("username");
-await rotur.friends.accept("username");
-await rotur.friends.remove("username");
-```
-
-### Following
-
-```ts
-await rotur.following.follow("username");
-await rotur.following.unfollow("username");
-const { followers } = await rotur.following.followers("username");
-const { following } = await rotur.following.following("username");
-```
-
-### Keys
-
-```ts
-await rotur.keys.create("my-key", { price: 50, subscription: true });
-const myKeys = await rotur.keys.mine();
-const key = await rotur.keys.get("key-id");
-const { owned } = await rotur.keys.check("username", "key-name");
-await rotur.keys.buy("key-id");
-```
-
-### Items
-
-```ts
-const item = await rotur.items.create({
-  name: "sword",
-  price: 100,
-  selling: true,
-});
-const item = await rotur.items.get("sword");
-const items = await rotur.items.list("username");
-await rotur.items.buy("sword");
-await rotur.items.sell("sword");
-```
-
-### Gifts
-
-```ts
-await rotur.gifts.create(500, { note: "Happy birthday!", expiresInHrs: 48 });
-const { gift } = await rotur.gifts.get("code");
-await rotur.gifts.claim("code");
-```
-
-### Tokens (sub-tokens / scoped access)
-
-```ts
-const { permissions, groups } = await rotur.tokens.permissions();
-const { tokens } = await rotur.tokens.list();
-
-const sub = await rotur.tokens.create(
-  "bot-token",
-  ["posts:view", "posts:create", "account:profile"],
-  { expiresInHrs: 24, origin: "my-app" },
-);
-
-await rotur.tokens.revoke(sub.id);
-```
-
-### Groups
-
-```ts
-const group = await rotur.groups.create("devs", "Developers", {
-  description: "A group for devs",
-  public: true,
-  joinPolicy: "OPEN",
-});
-
-await rotur.groups.join("devs");
-await rotur.groups.represent("devs");
-const announcements = await rotur.groups.announcements("devs");
-const roles = await rotur.groups.roles("devs");
-await rotur.groups.assignRole("devs", userId, roleId);
-```
-
-### Cosmetics
-
-```ts
-const shop = await rotur.cosmetics.shop({ sort: "newest", limit: 20 });
-const mine = await rotur.cosmetics.mine();
-await rotur.cosmetics.purchase("cosmetic-id");
-await rotur.cosmetics.equip("cosmetic-id");
-await rotur.cosmetics.unequip("hat");
-```
-
-### Files
-
-```ts
-const files = await rotur.files.index();
-const { used, max } = await rotur.files.usage();
-const file = await rotur.files.getByUUID("uuid");
-const file = await rotur.files.getByPath("path/to/file");
-await rotur.files.upload({
-  /* file data */
-});
-```
-
-### Push Notifications
-
-```ts
-const { public_key } = await rotur.push.vapidKeys();
-await rotur.push.register(endpoint, p256dh, auth, "my-app", "fingerprint");
-const { endpoints } = await rotur.push.endpoints();
-await rotur.push.send("username", "my-app", {
-  title: "Hi!",
-  body: "You have a message",
-});
-```
-
-### Status & Validators
-
-```ts
-const status = await rotur.status.get("username");
-const { validator } = await rotur.validators.generate("key");
-const result = await rotur.validators.validate(validator, "key");
-```
-
-### Standing, Stats, DevFund, Check
-
-```ts
-const standing = await rotur.standing.get("username");
-const economy = await rotur.stats.economy();
-await rotur.devfund.escrowTransfer(100, "petition-id");
-const { banned } = await rotur.check.banned(["user1", "user2"]);
-```
-
-## WebSocket (Real-time)
-
-```ts
-// Connect after login
-const { user_id, username } = await rotur.connectSocket();
-
-// Join presence rooms
-rotur.socket.join(["lobby", "chat"]);
-
-// Listen for events
 rotur.socket.on("member_join", (msg) => {
   console.log(`${msg.username} joined ${msg.room}`);
 });
 
-rotur.socket.on("status_update", (msg) => {
-  console.log(`${msg.username} is now ${msg.presence}`);
+rotur.socket.setStatus("Working on something", "online");
+
+// Stop everything
+rotur.logout();
+```
+
+## Authentication
+
+### Interactive login
+
+`rotur.login()` (via `performAuth`) opens the auth page at `https://rotur.dev/auth` in a popup window, listens for the token over `postMessage`, and stores it. If the popup is blocked, it falls back to a full-screen embedded iframe.
+
+```js
+await rotur.login({
+  system: "MyApp",      // optional system name
+  requires: ["posts:create"], // request specific permissions
+  timeout: 120_000,     // default timeout
+  signal: abortController.signal, // support cancellation
+  popupOnly: true,      // never fall back to iframe; throw if popup is blocked
+});
+```
+
+On failure a `AuthError` is thrown with a `code` of one of: `timeout`, `aborted`, `popup_blocked`, `no_token`.
+
+### Restoring a session
+
+Pass a stored token to the constructor, or set it later:
+
+```js
+const rotur = new Rotur({ token: localStorage.getItem("rotur_token") });
+// or
+rotur.setToken(storedToken);
+
+rotur.logout(); // clears the token and disconnects the socket
+```
+
+### Device / code linking
+
+For non-browser or cross-device flows, the `link` namespace exchanges a one-time code for a token:
+
+```js
+const { code } = await rotur.link.getCode();
+// show `code` to the user, then:
+const token = await rotur.link.pollUntilLinked(code, 1500, 120_000);
+```
+
+## REST API
+
+All authenticated requests automatically include the `Authorization: Bearer <token>` header. Public methods (marked below) can be called without a token.
+
+### Namespaces
+
+| Namespace | Description |
+| --- | --- |
+| `rotur.me` | Current user profile, key-value store, transfers, daily claims, badges, blocking, notes, friend requests, transactions, subscription |
+| `rotur.posts` | Create / delete / like / reply / repost / pin posts, feed, search, limits |
+| `rotur.friends` | Friend list, send / accept / reject / remove / cancel requests |
+| `rotur.following` | Follow / unfollow users, list followers / following |
+| `rotur.notifications` | Notification inbox |
+| `rotur.keys` | API keys — create, sell, subscribe, grant / revoke access, buy |
+| `rotur.items` | User items — create, buy, sell, transfer, set price |
+| `rotur.gifts` | Credit gift codes — create, claim, cancel |
+| `rotur.tokens` | Sub-tokens with scoped permissions — create, list, update, revoke |
+| `rotur.groups` | Group management — roles, members, invites, announcements, events, tips, products, bans |
+| `rotur.systems` | System-level users and configuration |
+| `rotur.stats` | Economy, user and follower statistics |
+| `rotur.status` | Fetch a user's status and presence |
+| `rotur.validators` | Generate / validate validators for a key |
+| `rotur.link` | Code-based account linking |
+| `rotur.cosmetics` | Cosmetic shop, purchase, equip / unequip |
+| `rotur.push` | Web Push notifications — register devices, send, manage senders |
+| `rotur.files` | File storage — index, upload, usage, delete |
+| `rotur.standing` | User standing (good / warning / suspended / banned) |
+| `rotur.profiles` | Public profiles, avatar / banner URL helpers |
+| `rotur.devfund` | Dev fund escrow transfers and releases |
+| `rotur.check` | Batch checks (e.g. banned users) |
+
+### Errors
+
+Non-2xx responses throw an `ApiError` with a `status` number and the parsed `data` payload:
+
+```js
+try {
+  await rotur.posts.create("");
+} catch (err) {
+  if (err instanceof ApiError) {
+    console.error(err.status, err.data);
+  }
+}
+```
+
+If a method requires authentication and no token is present, an `ApiError` with status `401` is thrown.
+
+## WebSocket
+
+The socket connects to `wss://api.accounts.bilup.org/status/ws`, authenticates with your token, sends heartbeats every 25 s and reconnects automatically after drops.
+
+```js
+await rotur.connectSocket(); // resolves once "ready" is received
+const socket = rotur.socket;
+
+console.log(socket.connected, socket.userId, socket.username);
+```
+
+### Events
+
+Listen with `socket.on(cmd, handler)` (returns an unsubscribe function) or `socket.once(cmd)` for a single-shot promise.
+
+| Event | Description |
+| --- | --- |
+| `ready` | Connection authenticated; carries `user_id`, `username`, initial keys |
+| `join_ok` / `leave_ok` | Confirmed room join / leave |
+| `room_state` | Members currently in a room |
+| `member_join` / `member_leave` | Member entered / left a room |
+| `status_update` | A member's status, presence or activities changed |
+| `profile_update` | A user's profile key changed |
+| `key_update` | One of your keys changed (also fires `onKeyChange`) |
+| `error` / `close` | Socket-level errors and disconnects |
+
+### Rooms, status & activities
+
+```js
+socket.join(["general", "dev"]);
+socket.leave("general");
+const rooms = await socket.listRooms();
+socket.roomState("general");
+
+socket.setStatus("Playing a game", "dnd");
+
+socket.setPlaying("My Game", {
+  title: "Level 4",
+  url: "https://example.com/game",
+  status: "Playing",
+  image: "https://example.com/screenshot.png",
 });
 
-// Set your own status
-rotur.socket.setStatus("Building something cool", "online");
-
-// Rich presence — "Playing" activity
-rotur.socket.setPlaying("My Game", {
-  title: "Level 3",
-  status: "In-game",
-  url: "https://mygame.com",
-});
-
-// "Listening to" activity
-rotur.socket.setMusic("Spotify", {
-  title: "Song Name",
+socket.setMusic("Spotify", {
+  title: "Song",
   artist: "Artist",
   album: "Album",
-  start: Date.now(),
-  end: Date.now() + 180_000,
+  start: 0,
+  end: 240,
 });
 
-// Wildcard — receive every message
-rotur.socket.on("*", (msg) => console.log(msg.cmd, msg));
-
-// Disconnect
-rotur.socket.disconnect();
+socket.clearActivity("My Game");
 ```
 
-The socket auto-reconnects with exponential backoff and sends heartbeats every 25s.
+### Key-value state
 
-## Error Handling
+The socket maintains a live cache of your user keys (`sys.*` and custom keys):
 
-```ts
-import { ApiError, AuthError } from "rotur-sdk";
-
-try {
-  await rotur.me.transfer("user", 1000);
-} catch (e) {
-  if (e instanceof ApiError) {
-    console.log(e.status); // HTTP status code
-    console.log(e.data); // response body
-    console.log(e.message); // human-readable error
-  }
-}
-
-try {
-  await rotur.login();
-} catch (e) {
-  if (e instanceof AuthError) {
-    console.log(e.code); // "timeout" | "aborted" | "popup_blocked" | "no_token"
-  }
-}
+```js
+socket.getKey("custom.score");          // current value
+socket.getAllKeys();                    // full snapshot
+const off = socket.onKeyChange((key, value, oldValue) => {
+  console.log(`${key}: ${oldValue} -> ${value}`);
+});
 ```
 
-## Building
+## Permissions
 
-```bash
-npm run build           # build CJS + ESM + types via tsup
-npm run dev             # watch mode
-npm run typecheck       # tsc --noEmit
-npm test                # vitest
-npm run gen:permissions # regenerate src/permissions.ts from backend routes
+The SDK ships a permission model that maps every SDK method to the token permission it requires. `resolvePermissions()` reduces a list of used methods to the minimal sorted permission set — `"full"` wins and collapses the whole set.
+
+```js
+import { resolvePermissions, METHOD_PERMISSIONS } from "accounts-sdk";
+
+const perms = resolvePermissions(["posts.create", "me.transfer", "groups.create"]);
+// e.g. ["credits:transfer", "groups:manage", "posts:create"]
 ```
 
-## Exports
+### Vite plugin
 
-| Export                      | Description                                                |
-| --------------------------- | ---------------------------------------------------------- |
-| `Rotur`                     | Main client class                                          |
-| `RoturSocket`               | WebSocket connection (real-time presence)                  |
-| `ApiError`                  | HTTP error with `status` and `data`                        |
-| `performAuth`, `AuthError`  | Browser auth flow                                          |
-| `AuthOptions`, `AuthResult` | Auth option types                                          |
-| `resolvePermissions`        | Map `"namespace.method"` keys → required permissions       |
-| `METHOD_PERMISSIONS`        | Static manifest of method → permission                     |
-| `rotur-sdk/vite`            | Vite plugin for automatic permission scoping               |
-| All types from `types.ts`   | `UserProfile`, `NetPost`, `GroupPublic`, `WSMessage`, etc. |
+`tools/vite-plugin` provides a Vite plugin that scans your source, detects every SDK method you call, computes the required permissions and injects them into `__ROTUR_REQUIRES__`, which is then requested during authentication.
+
+```js
+// vite.config.js
+import roturPermissions from "accounts-sdk/tools/vite-plugin";
+
+export default {
+  plugins: [
+    roturPermissions({
+      verbose: true,
+      extraPermissions: ["credits:view"], // force-include extras
+    }),
+  ],
+};
+```
+
+During `login()`, pass the requested permissions through `requires` so the auth page grants the minimal scope:
+
+```js
+const requires = typeof __ROTUR_REQUIRES__ !== "undefined" ? __ROTUR_REQUIRES__ : [];
+await rotur.login({ requires });
+```
+
+## Icons
+
+`iconToSvg()` renders Scratch-style icon strings to SVG.
+
+```js
+import { iconToSvg } from "accounts-sdk";
+
+const svg = iconToSvg("c #ff0000 w 1 line 0 0 10 10", {
+  size: 1,
+  color: "#ffffff",
+  strokeWidth: 1,
+  boldness: 0,
+  svgAttrs: { class: "icon" },
+});
+```
+
+## Tooling
+
+- `tools/permissions/gen.mjs` — regenerates `src/permissions.ts` (`METHOD_PERMISSIONS` / `NAMESPACE_BY_CLASS`) by parsing the Go API sources (expected in `~/api` by default). Run with `node tools/permissions/gen.mjs [path-to-api]`.
+- `tools/vite-plugin` — the permission-scanning Vite plugin described above.
+
+## Development
+
+This package is built from TypeScript sources in `src/` and published as the `dist/` bundle (`index.js`, `index.mjs`, `index.d.ts`, `index.d.mts`). The shipped type declarations are the source of truth for the API surface.
 
 ## License
 
-MIT
+ISC
