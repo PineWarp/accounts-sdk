@@ -1,0 +1,19 @@
+{
+  "name": "accounts-sdk",
+  "version": "1.0.0",
+  "description": "Bilup's mod of rotur-sdk",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bilup/accounts-sdk.git"
+  },
+  "author": "Bilup",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Bilup/accounts-sdk/issues"
+  },
+  "homepage": "https://github.com/Bilup/accounts-sdk#readme"
+}
