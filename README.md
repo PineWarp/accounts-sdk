@@ -62,7 +62,7 @@ rotur.logout();
 
 ### Interactive login
 
-`rotur.login()` (via `performAuth`) opens the auth page at `https://rotur.dev/auth` in a popup window, listens for the token over `postMessage`, and stores it. If the popup is blocked, it falls back to a full-screen embedded iframe.
+`rotur.login()` (via `performAuth`) opens the auth page at `https://accounts.bilup.org/auth` in a popup window, listens for the token over `postMessage`, and stores it. If the popup is blocked, it falls back to a full-screen embedded iframe.
 
 ```js
 await rotur.login({

@@ -342,8 +342,8 @@ var RoturSocket = class extends EventTarget {
 };
 
 // src/auth.ts
-var AUTH_URL = "https://rotur.dev/auth";
-var ORIGIN = "https://rotur.dev";
+var AUTH_URL = "https://accounts.bilup.org/auth";
+var ORIGIN = "https://accounts.bilup.org";
 function buildRequires(explicit) {
   const injected = typeof __ROTUR_REQUIRES__ !== "undefined" ? __ROTUR_REQUIRES__ : [];
   const set = /* @__PURE__ */ new Set([...injected, ...explicit ?? []]);
@@ -1210,7 +1210,7 @@ var StandingNamespace = class extends Namespace {
 };
 
 // src/client/profiles.ts
-var AVATARS_BASE = "https://avatars.rotur.dev";
+var AVATARS_BASE = "https://avatars.accounts.bilup.org";
 var ProfilesNamespace = class extends Namespace {
   async get(username, includePosts = true) {
     return this.$get(

@@ -2,7 +2,25 @@
   "name": "accounts-sdk",
   "version": "1.0.0",
   "description": "Bilup's mod of rotur-sdk",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./tools/vite-plugin/index.d.ts",
+      "default": "./tools/vite-plugin/index.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "tools"
+  ],
+  "sideEffects": false,
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
