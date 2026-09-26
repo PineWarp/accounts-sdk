@@ -1,7 +1,7 @@
 {
   "name": "accounts-sdk",
   "version": "1.0.0",
-  "description": "Bilup's mod of rotur-sdk",
+  "description": "PineWarp's mod of rotur-sdk",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -26,12 +26,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Bilup/accounts-sdk.git"
+    "url": "git+https://github.com/PineWarp/accounts-sdk.git"
   },
-  "author": "Bilup",
+  "author": "PineWarp",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Bilup/accounts-sdk/issues"
+    "url": "https://github.com/PineWarp/accounts-sdk/issues"
   },
-  "homepage": "https://github.com/Bilup/accounts-sdk#readme"
+  "homepage": "https://github.com/PineWarp/accounts-sdk#readme"
 }

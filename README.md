@@ -1,6 +1,5 @@
-# accounts-sdk
-
-Bilup's mod of **rotur-sdk** — a typed client SDK for the Accounts API (formerly Rotur).
+# accounts-sdk 🍍
+PineWarp's mod of **rotur-sdk** — a typed client SDK for the Accounts API (formerly Rotur).
 
 The SDK wraps the full platform API in a single library:
 
